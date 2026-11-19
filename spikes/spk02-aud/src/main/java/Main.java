@@ -2,6 +2,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 public class Main {
     public static void main(String[] args) throws Exception {
@@ -13,8 +15,7 @@ public class Main {
         Process processFirewall = firewall.start();
         List<String> results = new ArrayList<>();   // declared OUTSIDE the try, so we can use it after
 
-        try (BufferedReader readerFirewall = new BufferedReader(
-                new InputStreamReader(processFirewall.getInputStream()))) {
+        try (BufferedReader readerFirewall = new BufferedReader(new InputStreamReader(processFirewall.getInputStream()))) {
             String currentProfile = "";              // remembers the last profile seen
             String line;
 
@@ -48,12 +49,58 @@ public class Main {
 
         // PART 2 — decide
         if (results.size() != 3) {
-            System.out.println("Firewall: ERROR - could not read firewall state (found "
-                    + results.size() + " of 3 profiles)");
+            System.out.println("Firewall: ERROR - could not read firewall state (found " + results.size() + " of 3 profiles)");
         } else if (!offProfiles.isEmpty()) {
             System.out.println("Firewall: WARNING - profile(s) off: " + String.join(", ", offProfiles));
         } else {
             System.out.println("Firewall: OK - all profiles active (Domain, Private, Public)");
         }
+
+        Process processPorts = ports.start();
+        Set<String> openPorts = new TreeSet<>();
+        List<String> notAllowed = new ArrayList<>();
+        List<String> allowed = new ArrayList<>();
+        List<String> allowedPorts = List.of("443", "80", "8080");
+
+        try (BufferedReader readerPorts = new BufferedReader(new InputStreamReader(processPorts.getInputStream()))) {
+            String line;
+
+            while ((line = readerPorts.readLine()) != null) {
+
+                String trimmed = line.trim();
+                if (trimmed.contains("LISTENING")) {
+                    String[] words = trimmed.split("\\s+");
+                    String address = words[1];
+                    int pos = address.lastIndexOf(":");
+                    if (!address.startsWith("127.") && !address.startsWith("[::1]")) {
+                        String port = address.substring(pos + 1);
+                        openPorts.add(port);
+                    }
+                }
+
+            }
+            if (openPorts.isEmpty()) {
+                System.out.println("Open ports: ERROR - could not read netstat output (no LISTENING lines found)");
+            } else {
+                for (String port : openPorts) {
+                    if (allowedPorts.contains(port)) {
+                        allowed.add(port);
+                    } else {
+                        notAllowed.add(port);
+                    }
+                }
+                if (notAllowed.isEmpty()) {
+                    System.out.println("Open ports: OK - open and allowed: " + String.join(", ", allowed));
+                } else {
+                    System.out.println("Open ports: WARNING - unexpected ports listening: " + String.join(", ", notAllowed));
+                }
+
+            }
+
+        }
+        processPorts.waitFor();
+
     }
+
+
 }
