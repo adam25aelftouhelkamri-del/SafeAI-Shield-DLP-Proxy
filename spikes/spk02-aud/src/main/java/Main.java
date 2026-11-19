@@ -1,5 +1,6 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -7,6 +8,7 @@ import java.util.TreeSet;
 
 public class Main {
     public static void main(String[] args) throws Exception {
+        List<String> reportLines = new ArrayList<>();
         String keyFilePath="C:\\dev\\audit-test\\private-key.txt";
         ProcessBuilder ports = new ProcessBuilder("netstat", "-an");
         ProcessBuilder firewall = new ProcessBuilder("netsh", "advfirewall", "show", "allprofiles", "state");
@@ -49,11 +51,11 @@ public class Main {
 
         // PART 2 — decide
         if (results.size() != 3) {
-            System.out.println("Firewall: ERROR - could not read firewall state (found " + results.size() + " of 3 profiles)");
+            reportLines.add("Firewall: ERROR - could not read firewall state (found " + results.size() + " of 3 profiles)");
         } else if (!offProfiles.isEmpty()) {
-            System.out.println("Firewall: WARNING - profile(s) off: " + String.join(", ", offProfiles));
+            reportLines.add("Firewall: WARNING - profile(s) off: " + String.join(", ", offProfiles));
         } else {
-            System.out.println("Firewall: OK - all profiles active (Domain, Private, Public)");
+            reportLines.add("Firewall: OK - all profiles active (Domain, Private, Public)");
         }
 
         Process processPorts = ports.start();
@@ -80,7 +82,7 @@ public class Main {
 
             }
             if (openPorts.isEmpty()) {
-                System.out.println("Open ports: ERROR - could not read netstat output (no LISTENING lines found)");
+                reportLines.add("Open ports: ERROR - could not read netstat output (no LISTENING lines found)");
             } else {
                 for (String port : openPorts) {
                     if (allowedPorts.contains(port)) {
@@ -90,9 +92,9 @@ public class Main {
                     }
                 }
                 if (notAllowed.isEmpty()) {
-                    System.out.println("Open ports: OK - open and allowed: " + String.join(", ", allowed));
+                    reportLines.add("Open ports: OK - open and allowed: " + String.join(", ", allowed));
                 } else {
-                    System.out.println("Open ports: WARNING - unexpected ports listening: " + String.join(", ", notAllowed));
+                    reportLines.add("Open ports: WARNING - unexpected ports listening: " + String.join(", ", notAllowed));
                 }
 
             }
@@ -123,17 +125,23 @@ public class Main {
 
             }
             if(NotAllowedGroups.isEmpty() && allowedGroups.isEmpty()){
-                System.out.println("File permissions: ERROR - file not found: "+keyFilePath);
+                reportLines.add("File permissions: ERROR - file not found: "+keyFilePath);
             }else{
                 if(!NotAllowedGroups.isEmpty()){
-                    System.out.println("File permissions: WARNING - too broad access: "+String.join(", ", NotAllowedGroups));
+                    reportLines.add("File permissions: WARNING - too broad access: "+String.join(", ", NotAllowedGroups));
                 }else{
-                    System.out.println("File permissions: OK - only SYSTEM and Administrators have access");
+                    reportLines.add("File permissions: OK - only SYSTEM and Administrators have access");
                 }
             }
 
         }
         processFilePer.waitFor();
+
+        String report = "=== SafeAI Shield - NIST CSF Audit Report ===\n"
+                + "Date: " + LocalDateTime.now().withNano(0) + "\n"
+                + String.join("\n", reportLines);
+        System.out.println(report);
+
     }
 
 
