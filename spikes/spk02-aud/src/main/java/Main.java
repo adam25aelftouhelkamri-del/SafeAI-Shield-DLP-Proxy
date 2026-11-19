@@ -7,9 +7,10 @@ import java.util.TreeSet;
 
 public class Main {
     public static void main(String[] args) throws Exception {
+        String keyFilePath="C:\\dev\\audit-test\\private-key.txt";
         ProcessBuilder ports = new ProcessBuilder("netstat", "-an");
         ProcessBuilder firewall = new ProcessBuilder("netsh", "advfirewall", "show", "allprofiles", "state");
-        ProcessBuilder fileper = new ProcessBuilder("icacls", "C:\\dev\\audit-test\\private-key.txt");
+        ProcessBuilder fileper = new ProcessBuilder("icacls", keyFilePath);
 
         // ===== FIREWALL CHECK =====
         Process processFirewall = firewall.start();
@@ -36,7 +37,6 @@ public class Main {
         }
         processFirewall.waitFor();
 
-        System.out.println(results);
 
 
         // PART 1 — collect the profiles that are OFF
@@ -100,6 +100,40 @@ public class Main {
         }
         processPorts.waitFor();
 
+        Process processFilePer = fileper.start();
+        List<String> NotAllowedGroups = new ArrayList<>();
+        List<String> allowedGroups = new ArrayList<>();
+
+        try (BufferedReader readerfileper = new BufferedReader(new InputStreamReader(processFilePer.getInputStream()))) {
+            String line;
+
+            while ((line = readerfileper.readLine()) != null) {
+                String trimmed = line.trim();
+                int pos=trimmed.lastIndexOf(":");
+                if (pos == -1) continue;
+                String permission = trimmed.substring(0, pos);
+                if(permission.endsWith("Administrators") || permission.endsWith("SYSTEM") ){
+                    String name = permission.substring(permission.lastIndexOf("\\") + 1);
+                    allowedGroups.add(name);
+
+                }else{
+                    String name = permission.substring(permission.lastIndexOf("\\") + 1);
+                    NotAllowedGroups.add(name);
+                }
+
+            }
+            if(NotAllowedGroups.isEmpty() && allowedGroups.isEmpty()){
+                System.out.println("File permissions: ERROR - file not found: "+keyFilePath);
+            }else{
+                if(!NotAllowedGroups.isEmpty()){
+                    System.out.println("File permissions: WARNING - too broad access: "+String.join(", ", NotAllowedGroups));
+                }else{
+                    System.out.println("File permissions: OK - only SYSTEM and Administrators have access");
+                }
+            }
+
+        }
+        processFilePer.waitFor();
     }
 
 
