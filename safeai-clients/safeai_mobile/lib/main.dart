@@ -53,14 +53,15 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
 
-  void _incrementCounter() {
+  void _incrementCounter() async {
     setState(() {
-
       _counter++;
     });
     final auth = AuthService();
-    auth.login('emilys', 'emilyspass');
+    await auth.login('emilys', 'emilyspass');
+    await auth.getMe();
   }
+
 
   @override
   Widget build(BuildContext context) {
